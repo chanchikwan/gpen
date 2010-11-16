@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 
   printf("G-Pen: reimplementing the pencil code for GPU\n");
 
-  /* TODO: initialize arrays etc with nx, ny, and nz */
+  initialize_modules(nx, ny, nz);
 
   while(i++ < nt) {
     const Z ns = (Z)ceilf(tt / nt / dt);
