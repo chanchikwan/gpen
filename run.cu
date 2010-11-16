@@ -15,16 +15,17 @@ int main(int argc, char *argv[])
   const R fo = 0.0;    /* TODO: number of floating-point operations */
   const R dt = 1.0e-3; /* TODO: compute from velocity */
 
-  Z i = 0;
+  Q *f = NULL;
+  Z  i = 0;
   cudaEvent_t t0, t1;
   cudaEventCreate(&t0);
   cudaEventCreate(&t1);
 
   printf("G-Pen: reimplementing the pencil code for GPU\n");
 
-  initialize_modules(nx, ny, nz);
+  f = initialize_modules(nx, ny, nz);
 
-  while(i++ < nt) {
+  while(output(i++, f) < nt) {
     const Z ns = (Z)ceilf(tt / nt / dt);
     const R ds = tt / nt / ns;
 

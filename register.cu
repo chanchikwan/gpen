@@ -1,5 +1,7 @@
 #include "gpen.h"
 
+extern void initialize_io(void *, const Z, const Z, const Z);
+
 static void *f, *g, *h;
 
 static void done(void)
@@ -9,7 +11,7 @@ static void done(void)
   free(h);
 }
 
-void initialize_modules(const Z nx, const Z ny, const Z nz)
+Q *initialize_modules(const Z nx, const Z ny, const Z nz)
 {
   cudaError_t err;
 
@@ -26,5 +28,7 @@ void initialize_modules(const Z nx, const Z ny, const Z nz)
 
   atexit(done);
 
-  /* TODO: set modules */
+  initialize_io(h, nx, ny, nz);
+
+  return (Q *)f;
 }
