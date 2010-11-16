@@ -20,4 +20,6 @@ Q *initialize_modules(const Z, const Z, const Z);
 
 Z output(Z, const Q *);
 
+void initial_condition(Q *, Q (*)(R, R, R));
+
 #endif

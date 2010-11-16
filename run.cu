@@ -2,6 +2,22 @@
 #include <unistd.h>
 #include "gpen.h"
 
+Q f0(R x, R y, R z)
+{
+  Q f;
+
+  x -= 0.5;
+  y -= 0.5;
+  z -= 0.5;
+
+  f.lnrho = -0.5 * (x * x + y * y + z * z) / 0.01;
+  f.ux    = 0.0;
+  f.uy    = 0.0;
+  f.uz    = 0.0;
+
+  return f;
+}
+
 int main(int argc, char *argv[])
 {
   const char rotor[] = "-/|\\";
@@ -24,6 +40,8 @@ int main(int argc, char *argv[])
   printf("G-Pen: reimplementing the pencil code for GPU\n");
 
   f = initialize_modules(nx, ny, nz);
+
+  initial_condition(f, f0);
 
   while(output(i++, f) < nt) {
     const Z ns = (Z)ceilf(tt / nt / dt);
