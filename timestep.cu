@@ -1,10 +1,19 @@
 #include "gpen.h"
 
-static __constant__ Z nx ,ny;
+static __constant__ Z nx, ny;
 
 static uint3 gsz, bsz;
 
 static Q *res;
+
+__global__ void zero(Q *f)
+{
+  const Q q0 = {0, 0, 0, 0};
+
+  const Z n = (blockIdx.y * ny +  blockIdx.x) * nx + threadIdx.x;
+
+  f[n] = q0;
+}
 
 __global__ void kernel(Q *f, Q *g, const R dt_beta, const R alpha)
 {
@@ -50,7 +59,10 @@ void rk_2n(Q *f, const R dt)
   const R alpha[] = {-5./9., -153./128., 0.     };
   const R beta [] = { 1./3.,   15./16.,  8./ 15.};
 
-  Z i;
+  static Z i = 0;
+
+  if(i == 0) /* once rk_2n() is called, i == 3 */
+    zero<<<gsz, bsz>>>(res);
 
   for(i = 0; i < 3; ++i) {
     /* TODO: boundary condition */
