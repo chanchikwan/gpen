@@ -2,6 +2,7 @@
 
 extern void initialize_io               (void *, const Z, const Z, const Z);
 extern void initialize_initial_condition(void *, const Z, const Z, const Z);
+extern void initialize_rk_2n            (void *, const Z, const Z, const Z);
 
 static void *f, *g, *h;
 
@@ -31,6 +32,7 @@ Q *initialize_modules(const Z nx, const Z ny, const Z nz)
 
   initialize_io               (h, nx, ny, nz);
   initialize_initial_condition(h, nx, ny, nz);
+  initialize_rk_2n            (g, nx, ny, nz);
 
   return (Q *)f;
 }

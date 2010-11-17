@@ -22,4 +22,6 @@ Z output(Z, const Q *);
 
 void initial_condition(Q *, Q (*)(R, R, R));
 
+void rk_2n(Q *, const R);
+
 #endif

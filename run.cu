@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <unistd.h>
 #include "gpen.h"
 
 Q f0(R x, R y, R z)
@@ -28,7 +27,9 @@ int main(int argc, char *argv[])
   const Z ny = (argc > 4) ? atoi(argv[4]) :  nx;
   const Z nz = (argc > 5) ? atoi(argv[5]) :  ny;
 
-  const R fo = 0.0;    /* TODO: number of floating-point operations */
+  const R fo = 3.0 * nz * ny * nx * 12; /* floating-point operations */
+  const R br = 3.0 * nz * ny * nx * 2 * sizeof(Q); /* byte-read */
+  const R bw = 3.0 * nz * ny * nx * 2 * sizeof(Q); /* byte-written */
   const R dt = 1.0e-3; /* TODO: compute from velocity */
 
   Q *f = NULL;
@@ -58,17 +59,14 @@ int main(int argc, char *argv[])
     while(j++ < ns) {
       printf("\b\b\b\b\b\b%c %4d", rotor[j%4], j);
       fflush(stdout);
-
-      usleep(10000); /* TODO: time stepping */
-
-      cudaThreadSynchronize();
+      rk_2n(f, ds);
     }
     cudaEventRecord(t1, 0);
 
     cudaEventSynchronize(t1);
     cudaEventElapsedTime(&ms, t0, t1); ms /= ns;
-    printf("\b\b\b\b\b\b%.3f ms/cycle ~ %.3f GFLOPS\n",
-           ms, 1.0e-6 * fo / ms);
+    printf("\b\b\b\b\b\b%.3f ms/cycle ~ %.3f GFLOPS, %.3f GB/S\n",
+           ms, 1.0e-6 * fo / ms, 1.0e-6 * (br + bw) / ms);
   }
 
   cudaEventDestroy(t1);
