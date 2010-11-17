@@ -2,17 +2,22 @@
 #include "gpen.h"
 
 static Q *host;
-static Z  n;
+static Z  nx, ny, nz;
 
-void initialize_io(void *h, const Z nx, const Z ny, const Z nz)
+void initialize_io(void *h, const Z n, const Z m, const Z l)
 {
   host = (Q *)h;
-  n    = nx * ny * nz;
+
+  nx = n;
+  ny = m;
+  nz = l;
 }
 
 Z output(Z i, const Q *f)
 {
   cudaError_t err;
+
+  const Z n = nx * ny * nz;
 
   char  name[256];
   FILE *file;
@@ -22,6 +27,9 @@ Z output(Z i, const Q *f)
 
   sprintf(name, "%04d.raw", i);
   file = fopen(name, "wb");
+  fwrite(&nx,  sizeof(Z), 1, file);
+  fwrite(&ny,  sizeof(Z), 1, file);
+  fwrite(&nz,  sizeof(Z), 1, file);
   fwrite(host, sizeof(Q), n, file);
   fclose(file);
 
