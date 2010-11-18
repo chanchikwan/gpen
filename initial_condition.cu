@@ -1,22 +1,27 @@
 #include "gpen.h"
 
-static Q *host;
+static R *host;
 static Z  nx, ny, nz;
 
 void initialize_initial_condition(void *h, const Z n, const Z m, const Z l)
 {
-  host = (Q *)h;
+  host = (R *)h;
 
   nx = n;
   ny = m;
   nz = l;
 }
 
-void initial_condition(Q *f, Q (*f0)(R, R, R))
+void initial_condition(R *f, Q (*f0)(R, R, R))
 {
   cudaError_t err;
 
   const Z n = nx * ny * nz;
+
+  R *lnrho = host + 0 * n;
+  R *ux    = host + 1 * n;
+  R *uy    = host + 2 * n;
+  R *uz    = host + 3 * n;
 
   Z i, j, k;
 
@@ -26,11 +31,16 @@ void initial_condition(Q *f, Q (*f0)(R, R, R))
       const R y = (R)(j) / ny;
       for(i = 0; i < nx; ++i) {
         const R x = (R)(i) / nx;
-        host[(k * ny + j) * nx + i] = f0(x, y, z);
+        const Z l = (k * ny + j) * nx + i;
+        const Q f = f0(x, y, z);
+        lnrho[l] = f.lnrho;
+        ux   [l] = f.ux   ;
+        uy   [l] = f.uy   ;
+        uz   [l] = f.uz   ;
       }
     }
   }
 
-  err = cudaMemcpy(f, host, sizeof(Q) * n, cudaMemcpyHostToDevice);
+  err = cudaMemcpy(f, host, sizeof(R) * n * N_VAR, cudaMemcpyHostToDevice);
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 }

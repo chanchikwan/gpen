@@ -1,60 +1,52 @@
 #include "gpen.h"
 
-static __constant__ Z nx, ny;
+static __constant__ Z n;
 
-static uint3 gsz, bsz;
+static Z gsz, bsz;
 
-static Q *res;
+static R *res;
 
-__global__ void zero(Q *f)
+__global__ void zero(R *f)
 {
-  const Q q0 = {0, 0, 0, 0};
+  const Z l = blockIdx.x * blockDim.x + threadIdx.x;
 
-  const Z n = (blockIdx.y * ny +  blockIdx.x) * nx + threadIdx.x;
-
-  f[n] = q0;
+  if(l < n * N_VAR) f[l] = 0.0;
 }
 
-__global__ void kernel(Q *f, Q *g, const R dt_beta, const R alpha)
+__global__ void kernel(R *f, R *g, const R dt_beta, const R alpha)
 {
-  const Z n = (blockIdx.y * ny +  blockIdx.x) * nx + threadIdx.x;
+  const Z l = blockIdx.x * blockDim.x + threadIdx.x;
 
-  Q F = f[n]; /* sizeof(Q) read */
-  Q G = g[n]; /* sizeof(Q) read */
-
-  F.lnrho += dt_beta * G.lnrho;
-  F.ux    += dt_beta * G.ux   ;
-  F.uy    += dt_beta * G.uy   ;
-  F.uz    += dt_beta * G.uz   ;
-  /* 8 floating-point operations */
-
-  G.lnrho *= alpha;
-  G.ux    *= alpha;
-  G.uy    *= alpha;
-  G.uz    *= alpha;
-  /* 4 floating-point operations */
-
-  f[n] = F; /* sizeof(Q) write */
-  g[n] = G; /* sizeof(Q) write */
+  if(l < n * N_VAR) {
+    R F = f[l];
+    R G = g[l];
+    F += dt_beta * G;
+    G *= alpha;
+    f[l] = F;
+    g[l] = G;
+  }
 }
 
 void initialize_rk_2n(void *g, const Z nx, const Z ny, const Z nz)
 {
   cudaError_t err;
 
-  err = cudaMemcpyToSymbol("ny", &ny, sizeof(Z));
+  const Z n = nx * ny * nz;
+
+  cudaDeviceProp dev;
+  err = cudaGetDeviceProperties(&dev, 0);
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  err = cudaMemcpyToSymbol("nx", &nx, sizeof(Z));
+  err = cudaMemcpyToSymbol("n", &n, sizeof(Z));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  bsz = make_uint3(nx, 1,  1);
-  gsz = make_uint3(ny, nz, 1);
+  bsz = dev.maxThreadsPerBlock;
+  gsz = (n * N_VAR + bsz - 1) / bsz;
 
-  res = (Q *)g;
+  res = (R *)g;
 }
 
-void rk_2n(Q *f, const R dt)
+void rk_2n(R *f, const R dt)
 {
   const R alpha[] = {-5./9., -153./128., 0.     };
   const R beta [] = { 1./3.,   15./16.,  8./ 15.};

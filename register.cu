@@ -13,19 +13,19 @@ static void done(void)
   free(h);
 }
 
-Q *initialize_modules(const Z nx, const Z ny, const Z nz)
+R *initialize_modules(const Z nx, const Z ny, const Z nz)
 {
   cudaError_t err;
 
   const Z n = nx * ny * nz;
 
-  err = cudaMalloc(&f, sizeof(Q) * n);
+  err = cudaMalloc(&f, sizeof(R) * n * N_VAR);
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  err = cudaMalloc(&g, sizeof(Q) * n);
+  err = cudaMalloc(&g, sizeof(R) * n * N_VAR);
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  h = malloc(sizeof(Q) * n);
+  h = malloc(sizeof(R) * n * N_VAR);
   if(!h) error("fail to allocate host memory");
 
   atexit(done);
@@ -34,5 +34,5 @@ Q *initialize_modules(const Z nx, const Z ny, const Z nz)
   initialize_initial_condition(h, nx, ny, nz);
   initialize_rk_2n            (g, nx, ny, nz);
 
-  return (Q *)f;
+  return (R *)f;
 }

@@ -27,12 +27,12 @@ int main(int argc, char *argv[])
   const Z ny = (argc > 4) ? atoi(argv[4]) :  nx;
   const Z nz = (argc > 5) ? atoi(argv[5]) :  ny;
 
-  const R fo = 3.0 * nz * ny * nx * 12; /* floating-point operations */
-  const R br = 3.0 * nz * ny * nx * 2 * sizeof(Q); /* byte-read */
-  const R bw = 3.0 * nz * ny * nx * 2 * sizeof(Q); /* byte-written */
+  const R fo = 3.0 * nz * ny * nx * N_VAR * 3; /* floating-point operations */
+  const R br = 3.0 * nz * ny * nx * N_VAR * 2 * sizeof(R); /* byte-read */
+  const R bw = 3.0 * nz * ny * nx * N_VAR * 2 * sizeof(R); /* byte-written */
   const R dt = 1.0e-3; /* TODO: compute from velocity */
 
-  Q *f = NULL;
+  R *f = NULL;
   Z  i = 0;
   cudaEvent_t t0, t1;
   cudaEventCreate(&t0);
