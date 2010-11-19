@@ -1,8 +1,10 @@
 #include "gpen.h"
 
-static __constant__ Z n;
+static __constant__ Z n, m;
 
-static Z gsz, bsz;
+static uint3 gsz, bsz;
+
+static Z offset;
 
 static R *res;
 
@@ -10,20 +12,23 @@ __global__ void zero(R *f)
 {
   const Z l = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if(l < n * N_VAR) f[l] = 0.0;
+  if(l < n) f[blockIdx.y * n + l] = 0.0;
 }
 
 __global__ void kernel(R *f, R *g, const R dt_beta, const R alpha)
 {
   const Z l = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if(l < n * N_VAR) {
-    R F = f[l];
-    R G = g[l];
+  if(l < n) {
+    const Z lf = blockIdx.y * m + l;
+    const Z lg = blockIdx.y * n + l;
+
+    R F = f[lf];
+    R G = g[lg];
     F += dt_beta * G;
     G *= alpha;
-    f[l] = F;
-    g[l] = G;
+    f[lf] = F;
+    g[lg] = G;
   }
 }
 
@@ -32,6 +37,7 @@ void initialize_rk_2n(void *g, const Z nx, const Z ny, const Z nz)
   cudaError_t err;
 
   const Z n = nx * ny * nz;
+  const Z m = n + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
 
   cudaDeviceProp dev;
   err = cudaGetDeviceProperties(&dev, 0);
@@ -40,8 +46,18 @@ void initialize_rk_2n(void *g, const Z nx, const Z ny, const Z nz)
   err = cudaMemcpyToSymbol("n", &n, sizeof(Z));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  bsz = dev.maxThreadsPerBlock;
-  gsz = (n * N_VAR + bsz - 1) / bsz;
+  err = cudaMemcpyToSymbol("m", &m, sizeof(Z));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+
+  bsz.x = dev.maxThreadsPerBlock / 4; /* This increases performance...? */
+  bsz.y = 1;
+  bsz.z = 1;
+
+  gsz.x = (n + bsz.x - 1) / bsz.x;
+  gsz.y = N_VAR;
+  gsz.z = 1;
+
+  offset = nx * ny * RADIUS;
 
   res = (R *)g;
 }
@@ -59,7 +75,7 @@ void rk_2n(R *f, const R dt)
   for(i = 0; i < 3; ++i) {
     /* TODO: boundary condition */
     /* TODO: get res */
-    kernel<<<gsz, bsz>>>(f, res, dt * beta[i], alpha[i]);
+    kernel<<<gsz, bsz>>>(f + offset, res, dt * beta[i], alpha[i]);
     cudaThreadSynchronize();
   }
 }
