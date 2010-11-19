@@ -17,13 +17,14 @@ void initial_condition(R *f, Q (*f0)(R, R, R))
   cudaError_t err;
 
   const Z n = nx * ny * nz;
+  const Z m = n + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
 
   R *lnrho = host + 0 * n;
   R *ux    = host + 1 * n;
   R *uy    = host + 2 * n;
   R *uz    = host + 3 * n;
 
-  Z i, j, k;
+  Z h, i, j, k;
 
   for(k = 0; k < nz; ++k) {
     const R z = (R)(k) / nz;
@@ -41,6 +42,10 @@ void initial_condition(R *f, Q (*f0)(R, R, R))
     }
   }
 
-  err = cudaMemcpy(f, host, sizeof(R) * n * N_VAR, cudaMemcpyHostToDevice);
-  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  for(h = 0; h < N_VAR; ++h) {
+    err = cudaMemcpy(f    + h * m + nx * ny * RADIUS,
+                     host + h * n,
+                     sizeof(R) * n, cudaMemcpyHostToDevice);
+    if(cudaSuccess != err) error(cudaGetErrorString(err));
+  }
 }

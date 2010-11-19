@@ -18,12 +18,19 @@ Z output(Z i, const R *f)
   cudaError_t err;
 
   const Z n = nx * ny * nz;
+  const Z m = n + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
 
   char  name[256];
   FILE *file;
 
-  err = cudaMemcpy(host, f, sizeof(R) * n * N_VAR, cudaMemcpyDeviceToHost);
-  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  Z h;
+
+  for(h = 0; h < N_VAR; ++h) {
+    err = cudaMemcpy(host + h * n,
+                     f    + h * m + nx * ny * RADIUS,
+                     sizeof(R) * n, cudaMemcpyDeviceToHost);
+    if(cudaSuccess != err) error(cudaGetErrorString(err));
+  }
 
   sprintf(name, "%04d.raw", i);
   file = fopen(name, "wb");

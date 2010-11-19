@@ -18,8 +18,9 @@ R *initialize_modules(const Z nx, const Z ny, const Z nz)
   cudaError_t err;
 
   const Z n = nx * ny * nz;
+  const Z m = n + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
 
-  err = cudaMalloc(&f, sizeof(R) * n * N_VAR);
+  err = cudaMalloc(&f, sizeof(R) * m * N_VAR);
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
   err = cudaMalloc(&g, sizeof(R) * n * N_VAR);
