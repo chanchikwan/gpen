@@ -42,5 +42,49 @@ ARCHITECTURE: We use the so called "rolling cache" method to optimize
   the book "Code Generation in Action" by Herrington, 2003) is
   probably a better approach.
 
+GHOST ZONES: When writing a finite difference (or finite volume) code
+  using for-loops, the ghost zones should be packed into the data
+  arrays.  This allows the uniform operation on the actual data zones:
+
+    for(i = GHOST_SZ; i < N + GHOST_SZ; ++i) ...
+
+  However, we need to load things into the shared memory first.  Each
+  thread does its own operation.  There is no need to pack the ghost
+  zones together with the data.  In fact, because we need to copy the
+  ghost zones to the main memory in order to use MPI, it is better if
+  we can put all the ghost zones in a different pool.  This reduces
+  the number of call to cudaMemcpy().
+
+  Taking the rolling cache algorithm into account, we will pack the
+  ghost zones along the z-direction because there is a for-loop along
+  the z-direction.  The x- and y-ghost zones are, however, put into a
+  different pool.
+
+MEMORY LAYOUT: Note that, for performance reason, we will use
+  structure of pointers instead of pointer to structures.  I.e.,
+
+    Z count = Nx * Ny * Nz                                /* data  */
+            + (Nx * Ny + Ny * Nz + Nz * Nx) * 2 * RADIUS; /* ghost */
+
+    R *f; /* f points to the head */
+    cudaMalloc(&f, sizeof(R) * count * N_VAR);
+
+    R *block_lnrho = f + 0 * count;
+    R *block_ux    = f + 1 * count;
+    R *block_uy    = f + 2 * count;
+    R *block_uz    = f + 3 * count;
+    ...
+
+  For each variable, the memory layout is described by:
+
+    R *lnrho_ghost_zm = block_lnrho;
+    R *lnrho_data     = lnrho_ghost_zm + Nx * Ny * RADIUS;
+    R *lnrho_ghost_zp = lnrho_data     + Nx * Ny * Nz;
+    R *lnrho_ghost_y  = lnrho_ghost_zp + Nx * Ny * RADIUS;
+    R *lnrho_ghost_x  = lnrho_ghost_yp + Nx * RADIUS * Nz * 2;
+
+  The x- and y-ghost zones are packed together to ensure memory
+  locality when accessing them.
+
 * G-Pen is the most popular nib for drawing Japanese manga.  It is
   capable of drawing smooth lines with variant thickness.
