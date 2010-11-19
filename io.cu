@@ -37,6 +37,7 @@ Z output(Z i, const R *f)
   fwrite(&nx,  sizeof(Z), 1, file);
   fwrite(&ny,  sizeof(Z), 1, file);
   fwrite(&nz,  sizeof(Z), 1, file);
+  fwrite(&h,   sizeof(Z), 1, file); /* after the for-loop, h == N_VAR */
   fwrite(host, sizeof(R), n * N_VAR, file);
   fclose(file);
 

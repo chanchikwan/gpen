@@ -9,10 +9,10 @@ Q f0(R x, R y, R z)
   y -= 0.5;
   z -= 0.5;
 
-  f.lnrho = -0.5 * (x * x + y * y + z * z) / 0.01;
-  f.ux    = 0.0;
-  f.uy    = 0.0;
-  f.uz    = 0.0;
+  f.lnrho =                 -0.5 * (x * x + y * y + z * z) / 0.01 ;
+  f.ux    = -x / 0.01 * exp(-0.5 * (x * x + y * y + z * z) / 0.01);
+  f.uy    = -y / 0.01 * exp(-0.5 * (x * x + y * y + z * z) / 0.01);
+  f.uz    = -z / 0.01 * exp(-0.5 * (x * x + y * y + z * z) / 0.01);
 
   return f;
 }
