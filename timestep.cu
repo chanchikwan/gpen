@@ -74,7 +74,7 @@ void rk_2n(R *f, const R dt)
 
   for(i = 0; i < 3; ++i) {
     /* TODO: boundary condition */
-    /* TODO: get res */
+    pde(f, res);
     kernel<<<gsz, bsz>>>(f + offset, res, dt * beta[i], alpha[i]);
     cudaThreadSynchronize();
   }

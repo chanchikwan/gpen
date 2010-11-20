@@ -27,10 +27,15 @@ int main(int argc, char *argv[])
   const Z ny = (argc > 4) ? atoi(argv[4]) :  nx;
   const Z nz = (argc > 5) ? atoi(argv[5]) :  ny;
 
-  const R fo = 3.0 * nz * ny * nx * N_VAR * 3; /* floating-point operations */
-  const R br = 3.0 * nz * ny * nx * N_VAR * 2 * sizeof(R); /* byte-read */
-  const R bw = 3.0 * nz * ny * nx * N_VAR * 2 * sizeof(R); /* byte-written */
   const R dt = 1.0e-3; /* TODO: compute from velocity */
+
+  const R ndata  = nx * ny * nz;
+  const R nghost = nx * ny * (2 * RADIUS); /* z-ghost for now */
+
+  const R fo = 3 * N_VAR * ndata * 3; /* floating-point operations */
+  const R bw = 3 * N_VAR * ndata * sizeof(R) * 3;
+  const R br = 3 * N_VAR * ndata * sizeof(R) * 3
+             + 3 * N_VAR * nghost* sizeof(R);
 
   R *f = NULL;
   Z  i = 0;

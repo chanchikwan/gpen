@@ -25,4 +25,6 @@ void initial_condition(R *, Q (*)(R, R, R));
 
 void rk_2n(R *, const R);
 
+void pde(const R *, R *);
+
 #endif
