@@ -28,7 +28,7 @@ ARRAYS: We want to make the x-stride = 1 but C arrays are row major.
 
 ARCHITECTURE: We use the so called "rolling cache" method to optimize
   the GPU code (Micikevicius 2009).  Instead of working on 1 x 1 x Nx
-  pencils as in the pencil code, we use Nz x 16 x 16 thick pencils.
+  pencils as in the pencil code, we use Nz x 16 x 16 pencil bundles.
   Nz x 1 x 1 sub-pencils are then mapped naturally to CUDA threads,
   with an internal for-loop scanning along the x-direction.  The whole
   domain is than mapped into a grid of (Ny/16) x (Nx/16) blocks.

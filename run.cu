@@ -31,6 +31,8 @@ int main(int argc, char *argv[])
 
   const R ndata  = nx * ny * nz;
   const R nghost = nx * ny * (2 * RADIUS); /* z-ghost for now */
+  const R gpensz = TILE_X * TILE_Y * (1 + 2 * RADIUS) * N_VAR;
+  const R tilesz = (TILE_X + 2 * RADIUS) * (TILE_Y + 2 * RADIUS);
 
   const R fo = 3 * N_VAR * ndata * 3; /* floating-point operations */
   const R bw = 3 * N_VAR * ndata * sizeof(R) * 3;
@@ -44,6 +46,15 @@ int main(int argc, char *argv[])
   cudaEventCreate(&t1);
 
   printf("G-Pen: reimplementing the pencil code for GPU\n");
+
+  printf("Number of register used > %d\n",
+         11 * TILE_X * TILE_Y);
+  printf("Shared memory usage : %6.2f KiB\n",
+         sizeof(R) * (gpensz + tilesz) / 1024.0);
+  printf("Global memory usage : %6.2f MiB\n",
+         sizeof(R) * (2 * ndata + nghost) * N_VAR / 1024.0 / 1024.0);
+  printf("Host memory usage   : %6.2f MiB\n",
+         sizeof(R) * ndata * N_VAR / 1024.0 / 1024.0);
 
   f = initialize_modules(nx, ny, nz);
 
