@@ -1,6 +1,7 @@
 #include "gpen.h"
 
 #define HACK(x, y) if(i < 0) (x) = (y)
+#define GPEN(l, k) gpen[l][k][threadIdx.y][threadIdx.x]
 
 static __constant__ Z nx, ny, nz, stride, ntotal;
 
@@ -16,10 +17,8 @@ __global__ void rolling_cache(R *res, const R *f)
   const Z I = blockIdx.x * blockDim.x + threadIdx.x;
   const Z J = blockIdx.y * blockDim.y + threadIdx.y;
 
-  /* Cached data */
-  Q gpen[1 + 2 * RADIUS];
-
-  /* Tile with x- and y-ghost so we can compute derivatives */
+  /* Cached data, tile[][] includes ghosts so we can compute derivatives */
+  __shared__ R gpen[N_VAR][1 + 2 * RADIUS][TILE_Y][TILE_X];
   __shared__ R tile[TILE_Y + 2 * RADIUS][TILE_X + 2 * RADIUS];
 
   if(I < nx && J < ny) {
@@ -31,30 +30,30 @@ __global__ void rolling_cache(R *res, const R *f)
     /* Start up: pre-load G-Pens */
     #pragma unroll
     for(k = 0; k < 2 * RADIUS; ++k) {
-      gpen[k+1].lnrho = f[in + 0 * ntotal];
-      gpen[k+1].ux    = f[in + 1 * ntotal];
-      gpen[k+1].uy    = f[in + 2 * ntotal];
-      gpen[k+1].uz    = f[in + 3 * ntotal];
+      Z l;
+      #pragma unroll
+      for(l = 0; l < N_VAR; ++l)
+        GPEN(l, k + 1) = f[in + l * ntotal];
       in += stride;
     }
 
     for(k = 0; k < nz; ++k) {
       Z l;
 
-      /* Data shifting */
+      /* Data shifting and load the next z-slide */
       #pragma unroll
-      for(l = 0; l < 2 * RADIUS; ++l) gpen[l] = gpen[l+1];
-
-      /* Load the next z-slide */
-      gpen[2 * RADIUS].lnrho = f[in + 0 * ntotal];
-      gpen[2 * RADIUS].ux    = f[in + 1 * ntotal];
-      gpen[2 * RADIUS].uy    = f[in + 2 * ntotal];
-      gpen[2 * RADIUS].uz    = f[in + 3 * ntotal];
+      for(l = 0; l < N_VAR; ++l) {
+        Z m;
+        #pragma unroll
+        for(m = 0; m < 2 * RADIUS; ++m)
+          GPEN(l, m) = GPEN(l, m + 1);
+        GPEN(l, 2 * RADIUS) = f[in + l * ntotal];
+      }
 
       /* TODO: compute res */
 
       /* HACK: never reach, trick the compiler so we can measure performance */
-      HACK(res[out], gpen[j].lnrho + gpen[j].ux + gpen[j].uy + gpen[j].uz);
+      HACK(res[out], GPEN(0, j) + GPEN(1, j) + GPEN(2, j) + GPEN(3, j));
 
       in  += stride;
       out += stride;
