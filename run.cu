@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
   const R dt = 1.0e-3; /* TODO: compute from velocity */
 
   const R ndata  = nx * ny * nz;
-  const R nghost = nx * ny * (2 * RADIUS); /* z-ghost for now */
+  const R nghost = (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
   const R gpensz = TILE_X * TILE_Y * (1 + 2 * RADIUS) * N_VAR;
   const R tilesz = (TILE_X + 2 * RADIUS) * (TILE_Y + 2 * RADIUS);
 

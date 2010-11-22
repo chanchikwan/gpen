@@ -3,7 +3,7 @@
 #define HACK(x, y) if(i < 0) (x) = (y)
 #define GPEN(l, k) gpen[l][k][threadIdx.y][threadIdx.x]
 
-static __constant__ Z nx, ny, nz, stride, ntotal;
+static __constant__ Z nx, ny, nz, stride, ndata, ntotal;
 
 static uint3 gsz, bsz;
 
@@ -50,10 +50,42 @@ __global__ void rolling_cache(R *res, const R *f)
         GPEN(l, 2 * RADIUS) = f[in + l * ntotal];
       }
 
-      /* TODO: compute res */
+      #pragma unroll
+      for(l = 0; l < N_VAR; ++l) {
+        const R *data  = f + l * ntotal;
+        const R *ghost = data + ndata;
 
-      /* HACK: never reach, trick the compiler so we can measure performance */
-      HACK(res[out], GPEN(0, j) + GPEN(1, j) + GPEN(2, j) + GPEN(3, j));
+        /* Load y-ghost zones */
+        ghost += nx * ny * (2 * RADIUS);
+        if(threadIdx.y < RADIUS) {
+          tile[j - RADIUS][i] = (blockIdx.y == 0) ?
+            ghost[(k * 2 * RADIUS + j - RADIUS) * nx + I] :
+            data [in - RADIUS * stride - RADIUS * nx];
+          tile[j + TILE_Y][i] = (blockIdx.y == gridDim.y - 1) ?
+            ghost[(k * 2 * RADIUS + j         ) * nx + I] :
+            data [in - RADIUS * stride + TILE_Y * nx];
+        }
+
+        /* Load x-ghost zones */
+        ghost += nx * (2 * RADIUS) * nz;
+        if(threadIdx.x < RADIUS) {
+          tile[j][i - RADIUS] = (blockIdx.x == 0) ?
+            ghost[(k * ny + J) * 2 * RADIUS + i - RADIUS] :
+            data [in - RADIUS * stride - RADIUS];
+          tile[j][i + TILE_X] = (blockIdx.x == gridDim.x - 1) ?
+            ghost[(k * ny + J) * 2 * RADIUS + i         ] :
+            data [in - RADIUS * stride + TILE_X];
+        }
+
+        /* Copy saved data to tile[][] in order to compute derivatives */
+        tile[j][i] = GPEN(l, RADIUS);
+        __syncthreads();
+
+        /* HACK: never reach, trick the compiler to measure performance */
+        HACK(res[out + l * ndata], tile[i + RADIUS][j + RADIUS]);
+      }
+
+      /* TODO: compute res */
 
       in  += stride;
       out += stride;
@@ -79,6 +111,9 @@ void initialize_pde(const Z nx, const Z ny, const Z nz)
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
   err = cudaMemcpyToSymbol("stride", &s, sizeof(Z));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+
+  err = cudaMemcpyToSymbol("ndata",  &n, sizeof(Z));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
   err = cudaMemcpyToSymbol("ntotal", &m, sizeof(Z));
