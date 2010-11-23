@@ -25,8 +25,11 @@ __global__ void kernel(R *f, R *g, const R dt_beta, const R alpha)
 
     R F = f[lf];
     R G = g[lg];
+    /* FIXME: for testing only
     F += dt_beta * G;
-    G *= alpha;
+    G *= alpha; */
+    F = G;
+    G = 0;
     f[lf] = F;
     g[lg] = G;
   }
@@ -73,7 +76,7 @@ void rk_2n(R *f, const R dt)
     zero<<<gsz, bsz>>>(res);
 
   for(i = 0; i < 3; ++i) {
-    /* TODO: boundary condition */
+    update_ghosts(f);
     pde(f, res);
     kernel<<<gsz, bsz>>>(f + offset, res, dt * beta[i], alpha[i]);
     cudaThreadSynchronize();

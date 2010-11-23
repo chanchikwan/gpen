@@ -35,9 +35,10 @@ int main(int argc, char *argv[])
   const R tilesz = (TILE_X + 2 * RADIUS) * (TILE_Y + 2 * RADIUS);
 
   const R fo = 3 * N_VAR * ndata * 3; /* floating-point operations */
-  const R bw = 3 * N_VAR * ndata * sizeof(R) * 3;
-  const R br = 3 * N_VAR * ndata * sizeof(R) * 3
-             + 3 * N_VAR * nghost* sizeof(R);
+  const R bw = 3 * N_VAR * ndata * sizeof(R) * 4
+             + 3 * N_VAR * nghost* sizeof(R) * 1;
+  const R br = 3 * N_VAR * ndata * sizeof(R) * 4
+             + 3 * N_VAR * nghost* sizeof(R) * 2;
 
   R *f = NULL;
   Z  i = 0;

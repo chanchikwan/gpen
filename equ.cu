@@ -1,6 +1,5 @@
 #include "gpen.h"
 
-#define HACK(x, y) if(i < 0) (x) = (y)
 #define GPEN(l, k) gpen[l][k][threadIdx.y][threadIdx.x]
 
 static __constant__ Z nx, ny, nz, stride, ndata, ntotal;
@@ -81,8 +80,8 @@ __global__ void rolling_cache(R *res, const R *f)
         tile[j][i] = GPEN(l, RADIUS);
         __syncthreads();
 
-        /* HACK: never reach, trick the compiler to measure performance */
-        HACK(res[out + l * ndata], tile[i + RADIUS][j + RADIUS]);
+        /* FIXME: for testing onlly */
+        res[out + l * ndata] = tile[j - 1][i];
       }
 
       /* TODO: compute res */

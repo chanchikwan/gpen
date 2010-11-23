@@ -22,9 +22,9 @@ R *initialize_modules(const Z, const Z, const Z);
 Z output(Z, const R *);
 
 void initial_condition(R *, Q (*)(R, R, R));
+void update_ghosts(R *);
 
 void rk_2n(R *, const R);
-
 void pde(const R *, R *);
 
 #endif
