@@ -23,8 +23,8 @@ int main(int argc, char *argv[])
 
   const R tt = (argc > 1) ? atof(argv[1]) : 1.0;
   const Z nt = (argc > 2) ? atoi(argv[2]) : 100;
-  const Z nx = (argc > 3) ? atoi(argv[3]) : 256;
-  const Z ny = (argc > 4) ? atoi(argv[4]) :  nx;
+  const Z nx = (argc > 3) ? atox(argv[3]) : 256;
+  const Z ny = (argc > 4) ? atoy(argv[4]) :  nx;
   const Z nz = (argc > 5) ? atoi(argv[5]) :  ny;
 
   const R dt = 1.0e-3; /* TODO: compute from velocity */
@@ -48,6 +48,8 @@ int main(int argc, char *argv[])
 
   printf("G-Pen: reimplementing the pencil code for GPU\n");
 
+  printf("Resolution = %d x %d x %d\n",
+         nx, ny, nz);
   printf("Number of register used > %d\n",
          11 * TILE_X * TILE_Y);
   printf("Shared memory usage : %6.2f KiB\n",
