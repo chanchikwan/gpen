@@ -12,16 +12,19 @@ __global__ void periodic_x(R *f, const Z nx, const Z ny, const Z nz)
   const Z ndata  = nx * ny * nz;
   const Z ntotal = ndata + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
 
-  const Z i = threadIdx.x + (threadIdx.y ? 0 : RADIUS);
-  const Z ii= threadIdx.x + (threadIdx.y ? nx - RADIUS : 0);
-  const Z j = threadIdx.z;
-  const Z k = blockIdx.x;
-  const Z h = blockIdx.y;
+  const Z l = blockIdx.x * blockDim.y + threadIdx.y;
+  const Z i = threadIdx.x;
 
-  R *data  = f + h * ntotal + offset;
+  R *data  = f + blockIdx.y * ntotal + offset;
   R *ghost = data + ndata + offset + nx * (2 * RADIUS) * nz;
 
-  ghost[(k * ny + j) * 2 * RADIUS + i] = data[(k * ny + j) * nx + ii];
+  if(l < ny * nz) {
+    data  += l * nx;
+    ghost += l * (2 * RADIUS);
+
+    ghost[i] = data[i - RADIUS + nx];
+    ghost[i + RADIUS] = data[i];
+  }
 }
 
 __global__ void periodic_y(R *f, const Z nx, const Z ny, const Z nz)
@@ -30,16 +33,19 @@ __global__ void periodic_y(R *f, const Z nx, const Z ny, const Z nz)
   const Z ndata  = nx * ny * nz;
   const Z ntotal = ndata + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
 
-  const Z i = threadIdx.x;
-  const Z j = threadIdx.y + (threadIdx.z ? 0 : RADIUS);
-  const Z jj= threadIdx.y + (threadIdx.z ? ny - RADIUS : 0);
-  const Z k = blockIdx.x;
-  const Z h = blockIdx.y;
+  const Z l = blockIdx.x * blockDim.x + threadIdx.x;
+  Z k;
 
-  R *data  = f + h * ntotal + offset;
+  R *data  = f + blockIdx.y * ntotal + offset;
   R *ghost = data + ndata + offset;
 
-  ghost[(k * 2 * RADIUS + j) * nx + i] = data[(k * ny + jj) * nx + i];
+  if(l < nx * RADIUS) for(k = 0; k < nz; ++k) {
+    ghost[l] = data[l - nx * RADIUS + nx * ny];
+    ghost[l + nx * RADIUS] = data[l];
+
+    data  += nx * ny;
+    ghost += nx * (2 * RADIUS);
+  }
 }
 
 __global__ void periodic_z(R *f, const Z nx, const Z ny, const Z nz)
@@ -49,14 +55,13 @@ __global__ void periodic_z(R *f, const Z nx, const Z ny, const Z nz)
   const Z ntotal = ndata + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
 
   const Z l = blockIdx.x * blockDim.x + threadIdx.x;
-  const Z ll= l + offset;
-  const Z h = blockIdx.y;
+  const Z L = l + offset;
+
+  f += blockIdx.y * ntotal;
 
   if(l < offset) {
-    R *lower = f + h * ntotal;
-    R *upper = f + h * ntotal + ndata;
-    lower[l ] = upper[l ];
-    upper[ll] = lower[ll];
+    f[l] = f[l + ndata];
+    f[L + ndata] = f[L];
   }
 }
 
@@ -72,14 +77,29 @@ void initialize_boundcond(const Z n, const Z m, const Z l)
   ny = m;
   nz = l;
 
-  bsz_x = make_uint3(RADIUS, 2, ny);
-  gsz_x = make_uint3(nz, N_VAR, 1);
+  /* No assumption */
+  bsz_x.x = RADIUS;
+  bsz_x.y = dev.maxThreadsPerBlock / RADIUS;
+  bsz_x.z = 1;
+  gsz_x.x = (ny * nz * RADIUS + bsz_x.x * bsz_x.y - 1) / (bsz_x.x * bsz_x.y);
+  gsz_x.y = N_VAR;
+  gsz_x.z = 1;
 
-  bsz_y = make_uint3(nx, RADIUS, 2);
-  gsz_y = make_uint3(nz, N_VAR, 1);
+  /* No assumption but need for-loop along nz within the kernel */
+  bsz_y.x = dev.maxThreadsPerBlock / 4;
+  bsz_y.y = 1;
+  bsz_y.z = 1;
+  gsz_y.x = (nx * RADIUS + bsz_y.x - 1) / bsz_y.x;
+  gsz_y.y = N_VAR;
+  gsz_y.z = 1;
 
-  bsz_z = make_uint3(dev.maxThreadsPerBlock / 4, 1, 1);
-  gsz_z = make_uint3((nx * ny * RADIUS + bsz_z.x - 1) / bsz_z.x, N_VAR, 1);
+  /* No assumption */
+  bsz_z.x = dev.maxThreadsPerBlock / 4;
+  bsz_z.y = 1;
+  bsz_z.z = 1;
+  gsz_z.x = (nx * ny * RADIUS + bsz_z.x - 1) / bsz_z.x;
+  gsz_z.y = N_VAR;
+  gsz_z.z = 1;
 }
 
 void update_ghosts(R *f)
