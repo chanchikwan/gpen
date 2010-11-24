@@ -1,4 +1,5 @@
 #include "gpen.h"
+#include "deriv.h"
 
 #define GPEN(l, k) gpen[l][k][threadIdx.y][threadIdx.x]
 
@@ -80,11 +81,9 @@ __global__ void rolling_cache(R *res, const R *f)
         tile[j][i] = GPEN(l, RADIUS);
         __syncthreads();
 
-        /* FIXME: for testing onlly */
-        res[out + l * ndata] = tile[j - 1][i];
+        /* TODO: compute res; linear advection is just for testing */
+        res[out + l * ndata] -= (nx * D_X + ny * D_Y + nz * D_Z);
       }
-
-      /* TODO: compute res */
 
       in  += stride;
       out += stride;
