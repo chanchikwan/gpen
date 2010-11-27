@@ -1,24 +1,25 @@
 #include <stdio.h>
 #include "gpen.h"
 
-static R *host;
-static Z  nx, ny, nz;
+static R *Host;
+static Z Nx, Ny, Nz;
 
-void initialize_io(void *h, const Z n, const Z m, const Z l)
+void initialize_io(void *h, const Z nx, const Z ny, const Z nz)
 {
-  host = (R *)h;
+  Host = (R *)h;
 
-  nx = n;
-  ny = m;
-  nz = l;
+  Nx = nx;
+  Ny = ny;
+  Nz = nz;
 }
 
 Z output(Z i, const R *f)
 {
   cudaError_t err;
 
-  const Z n = nx * ny * nz;
-  const Z m = n + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
+  const Z ndata  = Nx * Ny * Nz;
+  const Z hghost = (Nx * Ny + Ny * Nz + Nz * Nx) * RADIUS;
+  const Z ntotal = ndata + 2 * hghost;
 
   char  name[256];
   FILE *file;
@@ -26,19 +27,18 @@ Z output(Z i, const R *f)
   Z h;
 
   for(h = 0; h < N_VAR; ++h) {
-    err = cudaMemcpy(host + h * n,
-                     f    + h * m + nx * ny * RADIUS,
-                     sizeof(R) * n, cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(Host + h * ndata, f + hghost + h * ntotal,
+                     sizeof(R) * ndata, cudaMemcpyDeviceToHost);
     if(cudaSuccess != err) error(cudaGetErrorString(err));
   }
 
   sprintf(name, "%04d.raw", i);
   file = fopen(name, "wb");
-  fwrite(&nx,  sizeof(Z), 1, file);
-  fwrite(&ny,  sizeof(Z), 1, file);
-  fwrite(&nz,  sizeof(Z), 1, file);
+  fwrite(&Nx,  sizeof(Z), 1, file);
+  fwrite(&Ny,  sizeof(Z), 1, file);
+  fwrite(&Nz,  sizeof(Z), 1, file);
   fwrite(&h,   sizeof(Z), 1, file); /* after the for-loop, h == N_VAR */
-  fwrite(host, sizeof(R), n * N_VAR, file);
+  fwrite(Host, sizeof(R), ndata * N_VAR, file);
   fclose(file);
 
   return i;
