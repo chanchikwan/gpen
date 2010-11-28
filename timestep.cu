@@ -1,27 +1,26 @@
 #include "gpen.h"
 
-static __constant__ Z n, m;
+static Z Ndata, Hghost, Ntotal;
 
-static uint3 gsz, bsz;
-
-static Z offset;
+static uint3 Gsz, Bsz;
 
 static R *res;
 
-__global__ void zero(R *f)
+__global__ void zero(R *f, const Z ndata)
 {
   const Z l = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if(l < n) f[blockIdx.y * n + l] = 0.0;
+  if(l < ndata) f[blockIdx.y * ndata + l] = 0.0;
 }
 
-__global__ void kernel(R *f, R *g, const R dt_beta, const R alpha)
+__global__ void kernel(R *f, R *g, const R dt_beta, const R alpha,
+                       const Z ndata, const Z hghost, const Z ntotal)
 {
   const Z l = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if(l < n) {
-    const Z lf = blockIdx.y * m + l;
-    const Z lg = blockIdx.y * n + l;
+  if(l < ndata) {
+    const Z lf = blockIdx.y * ntotal + l + hghost;
+    const Z lg = blockIdx.y * ndata  + l;
 
     R F = f[lf];
     R G = g[lg];
@@ -36,28 +35,21 @@ void initialize_rk_2n(void *g, const Z nx, const Z ny, const Z nz)
 {
   cudaError_t err;
 
-  const Z n = nx * ny * nz;
-  const Z m = n + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
-
   cudaDeviceProp dev;
   err = cudaGetDeviceProperties(&dev, 0);
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  err = cudaMemcpyToSymbol("n", &n, sizeof(Z));
-  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  Ndata  = nx * ny * nz;
+  Hghost = (nx * ny + ny * nz + nz * nx) * RADIUS;
+  Ntotal = Ndata + 2 * Hghost;
 
-  err = cudaMemcpyToSymbol("m", &m, sizeof(Z));
-  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  Bsz.x = dev.maxThreadsPerBlock / 4; /* This increases performance...? */
+  Bsz.y = 1;
+  Bsz.z = 1;
 
-  bsz.x = dev.maxThreadsPerBlock / 4; /* This increases performance...? */
-  bsz.y = 1;
-  bsz.z = 1;
-
-  gsz.x = (n + bsz.x - 1) / bsz.x;
-  gsz.y = N_VAR;
-  gsz.z = 1;
-
-  offset = nx * ny * RADIUS;
+  Gsz.x = (Ndata + Bsz.x - 1) / Bsz.x;
+  Gsz.y = N_VAR;
+  Gsz.z = 1;
 
   res = (R *)g;
 }
@@ -70,12 +62,12 @@ void rk_2n(R *f, const R dt)
   static Z i = 0;
 
   if(i == 0) /* once rk_2n() is called, i == 3 */
-    zero<<<gsz, bsz>>>(res);
+    zero<<<Gsz, Bsz>>>(res, Ndata);
 
   for(i = 0; i < 3; ++i) {
     /* TODO: boundary condition */
-    pde(f, res);
-    kernel<<<gsz, bsz>>>(f + offset, res, dt * beta[i], alpha[i]);
+    //pde(f, res);
+    kernel<<<Gsz, Bsz>>>(f, res, dt * beta[i], alpha[i], Ndata, Hghost, Ntotal);
     cudaThreadSynchronize();
   }
 }
