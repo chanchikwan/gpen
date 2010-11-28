@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "gpen.h"
 
-Q f0(R x, R y, R z)
+Q f0(double x, double y, double z)
 {
   Q f;
 
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
   printf("Host memory usage   : %6.2f MiB\n",
          sizeof(R) * ndata * N_VAR / 1024.0 / 1024.0);
 
-  f = initialize_modules(nx, ny, nz);
+  f = initialize_modules(nx, ny, nz, 1, 1, 1);
 
   initial_condition(f, f0);
 
@@ -71,7 +71,6 @@ int main(int argc, char *argv[])
            i, ds * ns * (i-1), ds * ns * i, ds);
 
     cudaEventRecord(t0, 0);
-
     while(j++ < ns) {
       printf("\b\b\b\b\b\b%c %4d", rotor[j%4], j);
       fflush(stdout);

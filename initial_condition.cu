@@ -1,38 +1,45 @@
 #include "gpen.h"
 
-static R *host;
-static Z  nx, ny, nz;
+static R *Host;
+static Z Nx, Ny, Nz;
+static R Lx, Ly, Lz;
 
-void initialize_initial_condition(void *h, const Z n, const Z m, const Z l)
+void initialize_initial_condition(void *h, const Z nx, const Z ny, const Z nz,
+                                           const R lx, const R ly, const R lz)
 {
-  host = (R *)h;
+  Host = (R *)h;
 
-  nx = n;
-  ny = m;
-  nz = l;
+  Nx = nx;
+  Ny = ny;
+  Nz = nz;
+
+  Lx = lx;
+  Ly = ly;
+  Lz = lz;
 }
 
-void initial_condition(R *f, Q (*f0)(R, R, R))
+void initial_condition(R *f, Q (*f0)(double, double, double))
 {
   cudaError_t err;
 
-  const Z n = nx * ny * nz;
-  const Z m = n + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
+  const Z ndata  = Nx * Ny * Nz;
+  const Z hghost = (Nx * Ny + Ny * Nz + Nz * Nx) * RADIUS;
+  const Z ntotal = ndata + 2 * hghost;
 
-  R *lnrho = host + 0 * n;
-  R *ux    = host + 1 * n;
-  R *uy    = host + 2 * n;
-  R *uz    = host + 3 * n;
+  R *lnrho = Host + 0 * ndata;
+  R *ux    = Host + 1 * ndata;
+  R *uy    = Host + 2 * ndata;
+  R *uz    = Host + 3 * ndata;
 
   Z h, i, j, k;
 
-  for(k = 0; k < nz; ++k) {
-    const R z = (R)(k) / nz;
-    for(j = 0; j < ny; ++j) {
-      const R y = (R)(j) / ny;
-      for(i = 0; i < nx; ++i) {
-        const R x = (R)(i) / nx;
-        const Z l = (k * ny + j) * nx + i;
+  for(k = 0; k < Nz; ++k) {
+    const double z = (double)Lz * k / Nz;
+    for(j = 0; j < Ny; ++j) {
+      const double y = (double)Ly * j / Ny;
+      for(i = 0; i < Nx; ++i) {
+        const double x = (double)Lx * i / Nx;
+        const Z l = (k * Ny + j) * Nx + i;
         const Q f = f0(x, y, z);
         lnrho[l] = f.lnrho;
         ux   [l] = f.ux   ;
@@ -43,9 +50,8 @@ void initial_condition(R *f, Q (*f0)(R, R, R))
   }
 
   for(h = 0; h < N_VAR; ++h) {
-    err = cudaMemcpy(f    + h * m + nx * ny * RADIUS,
-                     host + h * n,
-                     sizeof(R) * n, cudaMemcpyHostToDevice);
+    err = cudaMemcpy(f + hghost + h * ntotal, Host + h * ndata,
+                     sizeof(R) * ndata, cudaMemcpyHostToDevice);
     if(cudaSuccess != err) error(cudaGetErrorString(err));
   }
 }

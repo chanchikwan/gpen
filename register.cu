@@ -1,41 +1,46 @@
 #include "gpen.h"
 
 extern void initialize_io               (void *, const Z, const Z, const Z);
-extern void initialize_initial_condition(void *, const Z, const Z, const Z);
+extern void initialize_initial_condition(void *, const Z, const Z, const Z,
+                                                 const R, const R, const R);
+
 extern void initialize_rk_2n            (void *, const Z, const Z, const Z);
 extern void initialize_pde              (        const Z, const Z, const Z);
 
-static void *f, *g, *h;
+static void *Func, *Res, *Host;
 
 static void done(void)
 {
-  cudaFree(f);
-  cudaFree(g);
-  free(h);
+  cudaFree(Func);
+  cudaFree(Res);
+  free(Host);
 }
 
-R *initialize_modules(const Z nx, const Z ny, const Z nz)
+R *initialize_modules(const Z nx, const Z ny, const Z nz,
+                      const R lx, const R ly, const R lz)
 {
   cudaError_t err;
 
-  const Z n = nx * ny * nz;
-  const Z m = n + (nx * ny + ny * nz + nz * nx) * (2 * RADIUS);
+  const Z ndata  = nx * ny * nz;
+  const Z hghost = (nx * ny + ny * nz + nz * nx) * RADIUS;
+  const Z ntotal = ndata + 2 * hghost;
 
-  err = cudaMalloc(&f, sizeof(R) * m * N_VAR);
+  err = cudaMalloc(&Func, sizeof(R) * ntotal * N_VAR);
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  err = cudaMalloc(&g, sizeof(R) * n * N_VAR);
+  err = cudaMalloc(&Res,  sizeof(R) * ndata  * N_VAR);
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  h = malloc(sizeof(R) * n * N_VAR);
-  if(!h) error("fail to allocate host memory");
+  Host = malloc(sizeof(R) * ndata * N_VAR);
+  if(!Host) error("fail to allocate host memory");
 
   atexit(done);
 
-  initialize_io               (h, nx, ny, nz);
-  initialize_initial_condition(h, nx, ny, nz);
-  initialize_rk_2n            (g, nx, ny, nz);
-  initialize_pde              (   nx, ny, nz);
+  initialize_io               (Host, nx, ny, nz);
+  initialize_initial_condition(Host, nx, ny, nz,
+                                     lx, ly, lz);
+  initialize_rk_2n            (Res,  nx, ny, nz);
+  initialize_pde              (      nx, ny, nz);
 
-  return (R *)f;
+  return (R *)Func;
 }
