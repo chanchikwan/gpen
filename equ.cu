@@ -32,7 +32,8 @@ __global__ void rolling_cache(R *res, const R *f)
     const Z I = blockIdx.x * TILE_X + threadIdx.x;
     const Z J = blockIdx.y * TILE_Y + threadIdx.y;
 
-    /* For loading cache: this thread is in the domain */
+    /* This thread is in the domain, offset data and res to correct
+       locations for input and output */
     if(I < Nx && J < Ny) {
       Z in = J * Nx + I;
       data = f + Xghost + Yghost + in;
@@ -55,13 +56,16 @@ __global__ void rolling_cache(R *res, const R *f)
     else if(i >= TILE_X)
     {
       ghosti = i + RADIUS;
-      if(blockIdx.x < gridDim.x - 1) {
+      if(I + RADIUS < Nx) {
         xghost  = f + Hghost + J * Nx + I + RADIUS;
         xstride = Stride;
       } else {
-        ghosti -= gridDim.x * TILE_X - Nx;
-        xghost  = f + Ntotal - Xghost + J * RADIUS + (i - TILE_X);
+        xghost  = f + Ntotal - Xghost + J * RADIUS + (I + RADIUS - Nx);
         xstride = Ny * RADIUS;
+      }
+      if(blockIdx.x == gridDim.x - 1) {
+        xghost += (i - TILE_X) - (I + RADIUS - Nx);
+        ghosti -= gridDim.x * TILE_X - Nx;
       }
     }
 
@@ -81,13 +85,16 @@ __global__ void rolling_cache(R *res, const R *f)
     else if(j >= TILE_Y)
     {
       ghostj = j + RADIUS;
-      if(blockIdx.y < gridDim.y - 1) {
+      if(J + RADIUS < Ny) {
         yghost  = f + Hghost + (J + RADIUS) * Nx + I;
         ystride = Stride;
       } else {
-        ghostj -= gridDim.y * TILE_Y - Ny;
-        yghost  = f + Ntotal - Xghost - Yghost + (j - TILE_Y) * Nx + I;
+        yghost  = f + Ntotal - Xghost - Yghost + (J + RADIUS - Ny) * Nx + I;
         ystride = RADIUS * Nx;
+      }
+      if(blockIdx.y == gridDim.y - 1) {
+        yghost += ((j - TILE_Y) - (J + RADIUS - Ny)) * Nx;
+        ghostj -= gridDim.y * TILE_Y - Ny;
       }
     }
 
@@ -128,22 +135,23 @@ __global__ void rolling_cache(R *res, const R *f)
     }
 
     for(l = 0; l < N_VAR; ++l) {
+      __syncthreads();
+
       /* Copy cache into tile */
       tile[j][i] = CACHE(l, RADIUS);
-      __syncthreads();
 
       /* Load x-ghost */
       if(xghost) tile[j][ghosti] = XGHOST(l, k);
-      __syncthreads();
 
       /* Load y-ghost */
       if(yghost) tile[ghostj][i] = YGHOST(l, k);
+
+      /*----------------------------------------------------------------*/
       __syncthreads();
 
-  /*------------------------------------------------------------------------*/
       /* TODO: compute derivatives */
       if(data) {
-        RES(l, k) = tile[j][i - 1];
+        RES(l, k) = tile[j + 3][i];
         /* RES(l, k) = CACHE(l, RADIUS + 1); */
       }
     }
