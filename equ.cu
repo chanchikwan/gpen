@@ -1,100 +1,204 @@
 #include "gpen.h"
 
-#define HACK(x, y) if(i < 0) (x) = (y)
-#define GPEN(l, k) gpen[l][k][threadIdx.y][threadIdx.x]
+#define XGHOST(l, k) xghost[(l) * Ntotal + (k) * xstride]
+#define YGHOST(l, k) yghost[(l) * Ntotal + (k) * ystride]
+#define  CACHE(l, k)  cache[l][k][threadIdx.y][threadIdx.x]
+#define   DATA(l, k)   data[(l) * Ntotal + (k) * Stride]
+#define    RES(l, k)    res[(l) * Ndata  + (k) * Stride]
 
-static __constant__ Z nx, ny, nz, stride, ntotal;
+static __constant__ Z Nx, Ny, Nz, Stride, Ndata, Ntotal; /* sizes */
+static __constant__ Z Xghost, Yghost, Hghost; /* offsets */
 
-static uint3 gsz, bsz;
+static uint3 Gsz, Bsz;
 
 __global__ void rolling_cache(R *res, const R *f)
 {
+  /* Cache and tile[][] includes ghosts so we can compute derivatives */
+  __shared__ R cache[N_VAR][1 + 2 * RADIUS][TILE_Y][TILE_X];
+  __shared__ R tile[TILE_Y + 2 * RADIUS][TILE_X + 2 * RADIUS];
+
   /* For tile[][], shifted by RADIUS to take care the ghost cells */
   const Z i = threadIdx.x + RADIUS;
   const Z j = threadIdx.y + RADIUS;
 
-  /* For global array f[], just like the mn_loop in the pencil code */
-  const Z I = blockIdx.x * blockDim.x + threadIdx.x;
-  const Z J = blockIdx.y * blockDim.y + threadIdx.y;
+  /* Free running index along z direction */
+  Z k;
 
-  /* Cached data, tile[][] includes ghosts so we can compute derivatives */
-  __shared__ R gpen[N_VAR][1 + 2 * RADIUS][TILE_Y][TILE_X];
-  __shared__ R tile[TILE_Y + 2 * RADIUS][TILE_X + 2 * RADIUS];
+  /* Thread-dependent variables --- very complicated!!! */
+  const R *data = NULL, *xghost = NULL, *yghost = NULL;
+  Z xstride, ystride, ghosti, ghostj;
+  {
+    /* Global indices only needed to compute thread-dependent variables */
+    const Z I = blockIdx.x * TILE_X + threadIdx.x;
+    const Z J = blockIdx.y * TILE_Y + threadIdx.y;
 
-  if(I < nx && J < ny) {
-    Z k, in, out;
-
-    /* Pick the input  variable */
-    out = in = J * nx + I;
-
-    /* Start up: pre-load G-Pens */
-    #pragma unroll
-    for(k = 0; k < 2 * RADIUS; ++k) {
-      Z l;
-      #pragma unroll
-      for(l = 0; l < N_VAR; ++l)
-        GPEN(l, k + 1) = f[in + l * ntotal];
-      in += stride;
+    /* For loading cache: this thread is in the domain */
+    if(I < Nx && J < Ny) {
+      Z in = J * Nx + I;
+      data = f + Xghost + Yghost + in;
+      res += in;
     }
 
-    for(k = 0; k < nz; ++k) {
-      Z l;
-
-      /* Data shifting and load the next z-slide */
-      #pragma unroll
-      for(l = 0; l < N_VAR; ++l) {
-        Z m;
-        #pragma unroll
-        for(m = 0; m < 2 * RADIUS; ++m)
-          GPEN(l, m) = GPEN(l, m + 1);
-        GPEN(l, 2 * RADIUS) = f[in + l * ntotal];
+    /* This thread needs to load -x ghost */
+    if(threadIdx.x < RADIUS)
+    {
+      ghosti = threadIdx.x;
+      if(blockIdx.x) {
+        xghost  = f + Hghost + J * Nx + I - RADIUS;
+        xstride = Stride;
+      } else {
+        xghost  = f + J * RADIUS + threadIdx.x;
+        xstride = Ny * RADIUS;
       }
-
-      /* TODO: compute res */
-
-      /* HACK: never reach, trick the compiler so we can measure performance */
-      HACK(res[out], GPEN(0, j) + GPEN(1, j) + GPEN(2, j) + GPEN(3, j));
-
-      in  += stride;
-      out += stride;
     }
+    /* This thread needs to load +x ghost */
+    else if(i >= TILE_X)
+    {
+      ghosti = i + RADIUS;
+      if(blockIdx.x < gridDim.x - 1) {
+        xghost  = f + Hghost + J * Nx + I + RADIUS;
+        xstride = Stride;
+      } else {
+        ghosti -= gridDim.x * TILE_X - Nx;
+        xghost  = f + Ntotal - Xghost + J * RADIUS + (i - TILE_X);
+        xstride = Ny * RADIUS;
+      }
+    }
+
+    /* This thread needs to load -y ghost */
+    if(threadIdx.y < RADIUS)
+    {
+      ghostj = threadIdx.y;
+      if(blockIdx.y) {
+        yghost  = f + Hghost + (J - RADIUS) * Nx + I;
+        ystride = Stride;
+      } else {
+        yghost  = f + Xghost + threadIdx.y * Nx + I;
+        ystride = RADIUS * Nx;
+      }
+    }
+    /* This thread needs to load +y ghost */
+    else if(j >= TILE_Y)
+    {
+      ghostj = j + RADIUS;
+      if(blockIdx.y < gridDim.y - 1) {
+        yghost  = f + Hghost + (J + RADIUS) * Nx + I;
+        ystride = Stride;
+      } else {
+        ghostj -= gridDim.y * TILE_Y - Ny;
+        yghost  = f + Ntotal - Xghost - Yghost + (j - TILE_Y) * Nx + I;
+        ystride = RADIUS * Nx;
+      }
+    }
+
+    /* Unwind the stack for I and J since they are not needed anymore */
   }
+
+  /*========================================================================*/
+  /*                             ROLLING  CACHE                             */
+  /*------------------------------------------------------------------------*/
+  /* Start up: pre-load G-Pens */
+  if(data) {
+    Z l;
+    #pragma unroll
+    for(l = 0; l < N_VAR; ++l) {
+      #pragma unroll
+      for(k = 0; k < 2 * RADIUS; ++k)
+        CACHE(l, k + 1) = DATA(l, k);
+    }
+    data += (2 * RADIUS) * Stride; /* shift by z-ghost */
+  }
+
+  /*------------------------------------------------------------------------*/
+  /* Main z-loop: scan over z-slides; note that we place the k-loop
+     outside the l-loop in order to save memory */
+  for(k = 0; k < Nz; ++k) {
+    Z l;
+
+    #pragma unroll
+    for(l = 0; l < N_VAR; ++l) {
+      Z m;
+      #pragma unroll
+      /* Shift data */
+      for(m = 0; m < 2 * RADIUS; ++m)
+        CACHE(l, m) = CACHE(l, m + 1);
+      /* Load the next slide */
+      if(data)
+        CACHE(l, m) = DATA(l, k);
+    }
+
+    for(l = 0; l < N_VAR; ++l) {
+      /* Copy cache into tile */
+      tile[j][i] = CACHE(l, RADIUS);
+      __syncthreads();
+
+      /* Load x-ghost */
+      if(xghost) tile[j][ghosti] = XGHOST(l, k);
+      __syncthreads();
+
+      /* Load y-ghost */
+      if(yghost) tile[ghostj][i] = YGHOST(l, k);
+      __syncthreads();
+
+  /*------------------------------------------------------------------------*/
+      /* TODO: compute derivatives */
+      if(data) {
+        RES(l, k) = tile[j][i - 1];
+        /* RES(l, k) = CACHE(l, RADIUS + 1); */
+      }
+    }
+    /* TODO: compute res */
+  }
+  /*------------------------------------------------------------------------*/
+  /*                             ROLLING  CACHE                             */
+  /*========================================================================*/
+
 }
 
 void initialize_pde(const Z nx, const Z ny, const Z nz)
 {
   cudaError_t err;
 
-  const Z s = nx * ny;
-  const Z n = s * nz;
-  const Z m = n + (nx * ny + ny * nz + nz * nx) * 2 * RADIUS;
+  const Z xghost = ny * nz * RADIUS;
+  const Z yghost = nz * nx * RADIUS;
+  const Z hghost = nx * ny * RADIUS + xghost + yghost;
 
-  err = cudaMemcpyToSymbol("nx", &nx, sizeof(Z));
+  const Z stride = nx * ny;
+  const Z ndata  = nx * ny * nz;
+  const Z ntotal = ndata + 2 * hghost;
+
+  err = cudaMemcpyToSymbol("Nx", &nx, sizeof(Z));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  err = cudaMemcpyToSymbol("Ny", &ny, sizeof(Z));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  err = cudaMemcpyToSymbol("Nz", &nz, sizeof(Z));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  err = cudaMemcpyToSymbol("ny", &ny, sizeof(Z));
+  err = cudaMemcpyToSymbol("Stride", &stride, sizeof(Z));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  err = cudaMemcpyToSymbol("Ndata",  &ndata,  sizeof(Z));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  err = cudaMemcpyToSymbol("Ntotal", &ntotal, sizeof(Z));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  err = cudaMemcpyToSymbol("nz", &nz, sizeof(Z));
+  err = cudaMemcpyToSymbol("Xghost", &xghost, sizeof(Z));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  err = cudaMemcpyToSymbol("Yghost", &yghost, sizeof(Z));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  err = cudaMemcpyToSymbol("Hghost", &hghost, sizeof(Z));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  err = cudaMemcpyToSymbol("stride", &s, sizeof(Z));
-  if(cudaSuccess != err) error(cudaGetErrorString(err));
+  Bsz.x = TILE_X;
+  Bsz.y = TILE_Y;
+  Bsz.z = 1;
 
-  err = cudaMemcpyToSymbol("ntotal", &m, sizeof(Z));
-  if(cudaSuccess != err) error(cudaGetErrorString(err));
-
-  bsz.x = TILE_X;
-  bsz.y = TILE_Y;
-  bsz.z = 1;
-
-  gsz.x = (nx + TILE_X - 1) / TILE_X;
-  gsz.y = (ny + TILE_Y - 1) / TILE_Y;
-  gsz.z = 1;
+  Gsz.x = (nx + TILE_X - 1) / TILE_X;
+  Gsz.y = (ny + TILE_Y - 1) / TILE_Y;
+  Gsz.z = 1;
 }
 
 void pde(const R *f, R *res)
 {
   /* Use the memcpy() convention --- the output is the first argument */
-  rolling_cache<<<gsz, bsz>>>(res, f);
+  rolling_cache<<<Gsz, Bsz>>>(res, f);
 }
