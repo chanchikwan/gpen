@@ -1,4 +1,5 @@
 #include "gpen.h"
+#include "deriv.h"
 
 #define XGHOST(l, k) xghost[(l) * Ntotal + (k) * xstride]
 #define YGHOST(l, k) yghost[(l) * Ntotal + (k) * ystride]
@@ -150,10 +151,8 @@ __global__ void rolling_cache(R *res, const R *f)
       __syncthreads();
 
       /* TODO: compute derivatives */
-      if(data) {
-        RES(l, k) = tile[j + 3][i];
-        /* RES(l, k) = CACHE(l, RADIUS + 1); */
-      }
+      if(data)
+        RES(l, k) -= (Nx * D_X + Ny * D_Y + Nz * D_Z);
     }
     /* TODO: compute res */
   }

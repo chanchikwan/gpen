@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
   const R gpensz = TILE_X * TILE_Y * (1 + 2 * RADIUS) * N_VAR;
   const R tilesz = (TILE_X + 2 * RADIUS) * (TILE_Y + 2 * RADIUS);
 
-  const R fo = 3 * N_VAR * ndata * 3; /* floating-point operations */
+  const R fo = 3 * N_VAR * ndata * 33; /* floating-point operations */
   const R bw = 3 * N_VAR * ndata * sizeof(R) * 4
              + 3 * N_VAR * nghost* sizeof(R) * 1;
   const R br = 3 * N_VAR * ndata * sizeof(R) * 4

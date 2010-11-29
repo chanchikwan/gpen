@@ -24,11 +24,8 @@ __global__ void kernel(R *f, R *g, const R dt_beta, const R alpha,
 
     R F = f[lf];
     R G = g[lg];
-    /* For testing only
     F += dt_beta * G;
-    G *= alpha; */
-    F = G;
-    G = 0;
+    G *= alpha;
     f[lf] = F;
     g[lg] = G;
   }

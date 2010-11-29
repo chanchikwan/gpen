@@ -17,23 +17,17 @@ pro vis, i
   z = findgen(nz) / nz
 
   ; hard-wire 4 variables for hydro
-  rho = f[*,*,*,0]
+  rho = exp(f[*,*,*,0])
   ux  = f[*,*,*,1]
   uy  = f[*,*,*,2]
   uz  = f[*,*,*,3]
 
-  !p.multi=[0,4,3,0,1]
-  shade_surf, reform(rho[*,*,nz/2])
-  shade_surf, reform(rho[*,ny/2,*])
-  shade_surf, reform(rho[nx/2,*,*])
-  shade_surf, reform( ux[*,*,nz/2])
-  shade_surf, reform( ux[*,ny/2,*])
-  shade_surf, reform( ux[nx/2,*,*])
-  shade_surf, reform( uy[*,*,nz/2])
-  shade_surf, reform( uy[*,ny/2,*])
-  shade_surf, reform( uy[nx/2,*,*])
-  shade_surf, reform( uz[*,*,nz/2])
-  shade_surf, reform( uz[*,ny/2,*])
-  shade_surf, reform( uz[nx/2,*,*])
+  print, min(rho), max(rho)
+  
+  window, 0, xSize=2*nx, ySize=2*ny
+  tvscl, rho[*,*,nz/2-1], 0
+  tvscl,  ux[*,*,nz/2-1], 1
+  tvscl,  uy[*,*,nz/2-1], 2
+  tvscl,  uz[*,*,nz/2-1], 3
 
 end
