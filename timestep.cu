@@ -68,7 +68,7 @@ void rk_2n(R *f, const R dt)
     zero<<<Gsz, Bsz>>>(res, Ndata);
 
   for(i = 0; i < 3; ++i) {
-    /* TODO: boundary condition */
+    update_ghosts(f);
     pde(f, res);
     kernel<<<Gsz, Bsz>>>(f, res, dt * beta[i], alpha[i], Ndata, Hghost, Ntotal);
     cudaThreadSynchronize();
