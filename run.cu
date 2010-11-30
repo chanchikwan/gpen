@@ -26,6 +26,9 @@ int main(int argc, char *argv[])
   const Z nx = (argc > 3) ? atoi(argv[3]) : 256;
   const Z ny = (argc > 4) ? atoi(argv[4]) :  nx;
   const Z nz = (argc > 5) ? atoi(argv[5]) :  ny;
+  const R lx = (argc > 6) ? atof(argv[6]) : 1.0;
+  const R ly = (argc > 7) ? atof(argv[7]) :  lx;
+  const R lz = (argc > 8) ? atof(argv[8]) :  ly;
 
   const R dt = 1.0e-3; /* TODO: compute from velocity */
 
@@ -57,7 +60,7 @@ int main(int argc, char *argv[])
   printf("Host memory usage   : %6.2f MiB\n",
          sizeof(R) * ndata * N_VAR / 1024.0 / 1024.0);
 
-  f = initialize_modules(nx, ny, nz, 1, 1, 1);
+  f = initialize_modules(nx, ny, nz, lx, ly, lz);
 
   initial_condition(f, f0);
 

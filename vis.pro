@@ -4,17 +4,24 @@ pro vis, i
   print, 'loading: ' + name
 
   openr, lun, name, /get_lun
+
+    lx = 0. & readu, lun, lx
+    ly = 0. & readu, lun, ly
+    lz = 0. & readu, lun, lz
+
     nx = 0L & readu, lun, nx
     ny = 0L & readu, lun, ny
     nz = 0L & readu, lun, nz
     nv = 0L & readu, lun, nv
-    f = fltarr(nx, ny, nz, nv)
+
+    f  = fltarr(nx, ny, nz, nv)
     readu, lun, f
+
   close, lun & free_lun, lun
 
-  x = findgen(nx) / nx
-  y = findgen(ny) / ny
-  z = findgen(nz) / nz
+  x = lx * findgen(nx) / nx
+  y = ly * findgen(ny) / ny
+  z = lz * findgen(nz) / nz
 
   ; hard-wire 4 variables for hydro
   rho = exp(f[*,*,*,0])

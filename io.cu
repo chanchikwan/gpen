@@ -3,14 +3,20 @@
 
 static R *Host;
 static Z Nx, Ny, Nz;
+static R Lx, Ly, Lz;
 
-void initialize_io(void *h, const Z nx, const Z ny, const Z nz)
+void initialize_io(void *h, const Z nx, const Z ny, const Z nz,
+                            const R lx, const R ly, const R lz)
 {
   Host = (R *)h;
 
   Nx = nx;
   Ny = ny;
   Nz = nz;
+
+  Lx = lx;
+  Ly = ly;
+  Lz = lz;
 }
 
 Z output(Z i, const R *f)
@@ -34,6 +40,9 @@ Z output(Z i, const R *f)
 
   sprintf(name, "%04d.raw", i);
   file = fopen(name, "wb");
+  fwrite(&Lx,  sizeof(R), 1, file);
+  fwrite(&Ly,  sizeof(R), 1, file);
+  fwrite(&Lz,  sizeof(R), 1, file);
   fwrite(&Nx,  sizeof(Z), 1, file);
   fwrite(&Ny,  sizeof(Z), 1, file);
   fwrite(&Nz,  sizeof(Z), 1, file);

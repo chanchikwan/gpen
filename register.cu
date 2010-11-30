@@ -1,6 +1,7 @@
 #include "gpen.h"
 
-extern void initialize_io               (void *, const Z, const Z, const Z);
+extern void initialize_io               (void *, const Z, const Z, const Z,
+                                                 const R, const R, const R);
 extern void initialize_initial_condition(void *, const Z, const Z, const Z,
                                                  const R, const R, const R);
 
@@ -38,13 +39,11 @@ R *initialize_modules(const Z nx, const Z ny, const Z nz,
 
   atexit(done);
 
-  initialize_io               (Host, nx, ny, nz);
-  initialize_initial_condition(Host, nx, ny, nz,
-                                     lx, ly, lz);
-  initialize_boundcond        (      nx, ny, nz);
-  initialize_rk_2n            (Res,  nx, ny, nz);
-  initialize_pde              (      nx, ny, nz,
-                                     lx, ly, lz);
+  initialize_io               (Host, nx, ny, nz, lx, ly, lz);
+  initialize_initial_condition(Host, nx, ny, nz, lx, ly, lz);
+  initialize_boundcond        (      nx, ny, nz            );
+  initialize_rk_2n            (Res,  nx, ny, nz            );
+  initialize_pde              (      nx, ny, nz, lx, ly, lz);
 
   return (R *)Func;
 }
