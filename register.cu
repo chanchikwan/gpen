@@ -6,7 +6,8 @@ extern void initialize_initial_condition(void *, const Z, const Z, const Z,
 
 extern void initialize_boundcond        (        const Z, const Z, const Z);
 extern void initialize_rk_2n            (void *, const Z, const Z, const Z);
-extern void initialize_pde              (        const Z, const Z, const Z);
+extern void initialize_pde              (        const Z, const Z, const Z,
+                                                 const R, const R, const R);
 
 static void *Func, *Res, *Host;
 
@@ -42,7 +43,8 @@ R *initialize_modules(const Z nx, const Z ny, const Z nz,
                                      lx, ly, lz);
   initialize_boundcond        (      nx, ny, nz);
   initialize_rk_2n            (Res,  nx, ny, nz);
-  initialize_pde              (      nx, ny, nz);
+  initialize_pde              (      nx, ny, nz,
+                                     lx, ly, lz);
 
   return (R *)Func;
 }
