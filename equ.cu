@@ -1,5 +1,6 @@
 #include "gpen.h"
 #include "deriv.h"
+#include "hydro.h"
 
 #define XGHOST(l, k) xghost[(l) * Ntotal + (k) * xstride]
 #define YGHOST(l, k) yghost[(l) * Ntotal + (k) * ystride]
@@ -22,6 +23,9 @@ __global__ void rolling_cache(R *res, const R *f)
   /* For tile[][], shifted by RADIUS to take care the ghost cells */
   const Z i = threadIdx.x + RADIUS;
   const Z j = threadIdx.y + RADIUS;
+
+  /* Store derivatives */
+  R fx[N_VAR], fy[N_VAR], fz[N_VAR];
 
   /* Free running index along z direction */
   Z k;
@@ -137,8 +141,6 @@ __global__ void rolling_cache(R *res, const R *f)
     }
 
     for(l = 0; l < N_VAR; ++l) {
-      __syncthreads();
-
       /* Copy cache into tile */
       tile[j][i] = CACHE(l, RADIUS);
 
@@ -148,14 +150,29 @@ __global__ void rolling_cache(R *res, const R *f)
       /* Load y-ghost */
       if(yghost) tile[ghostj][i] = YGHOST(l, k);
 
-      /*----------------------------------------------------------------*/
       __syncthreads();
 
-      /* TODO: compute derivatives */
-      if(data)
-        RES(l, k) -= (D_X + D_Y + D_Z);
+      /* Compute derivatives */
+      fx[l] = D_X;
+      fy[l] = D_Y;
+      fz[l] = D_Z;
+
+      __syncthreads();
     }
-    /* TODO: compute res */
+
+    /*--------------------------------------------------------------------*/
+    /* Compute res */
+    if(data) {
+      /* Continuity equation */
+      RES(0, k) -= ADVECTION(0) + fx[1] + fy[2] + fz[3];
+      /* x-momentum equation */
+      RES(1, k) -= ADVECTION(1);
+      /* y-momentum equation */
+      RES(2, k) -= ADVECTION(2);
+      /* z-momentum equation */
+      RES(3, k) -= ADVECTION(3);
+    }
+    __syncthreads();
   }
   /*------------------------------------------------------------------------*/
   /*                             ROLLING  CACHE                             */
