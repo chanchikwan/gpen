@@ -9,10 +9,10 @@ Q f0(double x, double y, double z)
   y -= 0.5;
   z -= 0.5;
 
-  f.lnrho = -0.5 * (x * x + y * y + z * z) / 0.01 ;
-  f.ux    = 1.0;
-  f.uy    = 1.0;
-  f.uz    = 1.0;
+  f.lnrho = log(0.1 * exp(-0.5 * (x * x + y * y + z * z) / 0.01) + 1.0);
+  f.ux    = 0.0;
+  f.uy    = 0.0;
+  f.uz    = 0.0;
 
   return f;
 }
@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
   const R gpensz = TILE_X * TILE_Y * (1 + 2 * RADIUS) * N_VAR;
   const R tilesz = (TILE_X + 2 * RADIUS) * (TILE_Y + 2 * RADIUS);
 
-  const R fo = 3 * ndata * (N_VAR * 33 + 3);
+  const R fo = 3 * ndata * (N_VAR * 33 + 6);
   const R bw = 3 * N_VAR * ndata * sizeof(R) * 4
              + 3 * N_VAR * nghost* sizeof(R) * 1;
   const R br = 3 * N_VAR * ndata * sizeof(R) * 4

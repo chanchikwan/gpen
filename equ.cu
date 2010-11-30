@@ -166,11 +166,11 @@ __global__ void rolling_cache(R *res, const R *f)
       /* Continuity equation */
       RES(0, k) -= ADVECTION(0) + fx[1] + fy[2] + fz[3];
       /* x-momentum equation */
-      RES(1, k) -= ADVECTION(1);
+      RES(1, k) -= ADVECTION(1) + fx[0];
       /* y-momentum equation */
-      RES(2, k) -= ADVECTION(2);
+      RES(2, k) -= ADVECTION(2) + fy[0];
       /* z-momentum equation */
-      RES(3, k) -= ADVECTION(3);
+      RES(3, k) -= ADVECTION(3) + fz[0];
     }
     __syncthreads();
   }
@@ -185,6 +185,10 @@ void initialize_pde(const Z nx, const Z ny, const Z nz,
 {
   cudaError_t err;
 
+  const R dx = lx / nx;
+  const R dy = ly / ny;
+  const R dz = lz / nz;
+
   const Z xghost = ny * nz * RADIUS;
   const Z yghost = nz * nx * RADIUS;
   const Z hghost = nx * ny * RADIUS + xghost + yghost;
@@ -194,7 +198,7 @@ void initialize_pde(const Z nx, const Z ny, const Z nz,
   const Z ntotal = ndata + 2 * hghost;
 
   const R coef[] = {45.0/60.0, -9.0/60.0, 1.0/60.0};
-  R d[RADIUS];
+  R temp[RADIUS];
   Z i;
 
   err = cudaMemcpyToSymbol("Nx", &nx, sizeof(Z));
@@ -218,16 +222,16 @@ void initialize_pde(const Z nx, const Z ny, const Z nz,
   err = cudaMemcpyToSymbol("Hghost", &hghost, sizeof(Z));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  for(i = 0; i < RADIUS; ++i) d[i] = coef[i] / (lx / nx);
-  err = cudaMemcpyToSymbol("Dx", d, RADIUS * sizeof(R));
+  for(i = 0; i < RADIUS; ++i) temp[i] = coef[i] / dx;
+  err = cudaMemcpyToSymbol("Dx", temp, RADIUS * sizeof(R));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  for(i = 0; i < RADIUS; ++i) d[i] = coef[i] / (ly / ny);
-  err = cudaMemcpyToSymbol("Dy", d, RADIUS * sizeof(R));
+  for(i = 0; i < RADIUS; ++i) temp[i] = coef[i] / dy;
+  err = cudaMemcpyToSymbol("Dy", temp, RADIUS * sizeof(R));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
-  for(i = 0; i < RADIUS; ++i) d[i] = coef[i] / (lz / nz);
-  err = cudaMemcpyToSymbol("Dz", d, RADIUS * sizeof(R));
+  for(i = 0; i < RADIUS; ++i) temp[i] = coef[i] / dz;
+  err = cudaMemcpyToSymbol("Dz", temp, RADIUS * sizeof(R));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
   Bsz.x = TILE_X;
