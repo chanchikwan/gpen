@@ -20,7 +20,8 @@ void _error(const char *, const int, const char *, const char *);
 R *initialize_modules(const R, const Z, const Z, const Z,
                                const R, const R, const R);
 
-Z output(Z, const R *);
+Z output_raw(Z, const R *);
+Z output_vtk(Z, const R *);
 
 void initial_condition(R *, Q (*)(double, double, double));
 void update_ghosts(R *);

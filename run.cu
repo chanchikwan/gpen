@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
 
   initial_condition(f, f0);
 
-  while(output(i++, f) < nt) {
+  while(output_raw(i++, f) < nt) {
     const Z ns = (Z)ceilf(tt / nt / dt);
     const R ds = tt / nt / ns;
 
