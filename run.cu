@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 
   const R tt = (argc > 1) ? atof(argv[1]) : 1.0;
   const Z nt = (argc > 2) ? atoi(argv[2]) : 100;
-  const Z nx = (argc > 3) ? atoi(argv[3]) : 256;
+  const Z nx = (argc > 3) ? atoi(argv[3]) : 128;
   const Z ny = (argc > 4) ? atoi(argv[4]) :  nx;
   const Z nz = (argc > 5) ? atoi(argv[5]) :  ny;
   const R lx = (argc > 6) ? atof(argv[6]) : 1.0;
@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
   const R gpensz = TILE_X * TILE_Y * (1 + 2 * RADIUS) * N_VAR;
   const R tilesz = (TILE_X + 2 * RADIUS) * (TILE_Y + 2 * RADIUS);
 
-  const R fo = 3 * N_VAR * ndata * 33; /* floating-point operations */
+  const R fo = 3 * N_VAR * ndata * 30; /* floating-point operations */
   const R bw = 3 * N_VAR * ndata * sizeof(R) * 4
              + 3 * N_VAR * nghost* sizeof(R) * 1;
   const R br = 3 * N_VAR * ndata * sizeof(R) * 4
