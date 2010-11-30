@@ -17,7 +17,8 @@ typedef struct {R lnrho, ux, uy, uz;} Q;
 void _error(const char *, const int, const char *, const char *);
 #define error(message) _error(__FILE__, __LINE__, __func__, message)
 
-R *initialize_modules(const Z, const Z, const Z, const R, const R, const R);
+R *initialize_modules(const R, const Z, const Z, const Z,
+                               const R, const R, const R);
 
 Z output(Z, const R *);
 

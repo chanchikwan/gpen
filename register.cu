@@ -1,14 +1,14 @@
 #include "gpen.h"
 
-extern void initialize_io               (void *, const Z, const Z, const Z,
-                                                 const R, const R, const R);
-extern void initialize_initial_condition(void *, const Z, const Z, const Z,
-                                                 const R, const R, const R);
+extern void initialize_io               (void  *, const Z, const Z, const Z,
+                                                  const R, const R, const R);
+extern void initialize_initial_condition(void  *, const Z, const Z, const Z,
+                                                  const R, const R, const R);
 
-extern void initialize_boundcond        (        const Z, const Z, const Z);
-extern void initialize_rk_2n            (void *, const Z, const Z, const Z);
-extern void initialize_pde              (        const Z, const Z, const Z,
-                                                 const R, const R, const R);
+extern void initialize_boundcond        (         const Z, const Z, const Z);
+extern void initialize_rk_2n            (void  *, const Z, const Z, const Z);
+extern void initialize_pde              (const R, const Z, const Z, const Z,
+                                                  const R, const R, const R);
 
 static void *Func, *Res, *Host;
 
@@ -19,8 +19,8 @@ static void done(void)
   free(Host);
 }
 
-R *initialize_modules(const Z nx, const Z ny, const Z nz,
-                      const R lx, const R ly, const R lz)
+R *initialize_modules(const R nu, const Z nx, const Z ny, const Z nz,
+                                  const R lx, const R ly, const R lz)
 {
   cudaError_t err;
 
@@ -43,7 +43,7 @@ R *initialize_modules(const Z nx, const Z ny, const Z nz,
   initialize_initial_condition(Host, nx, ny, nz, lx, ly, lz);
   initialize_boundcond        (      nx, ny, nz            );
   initialize_rk_2n            (Res,  nx, ny, nz            );
-  initialize_pde              (      nx, ny, nz, lx, ly, lz);
+  initialize_pde              (nu,   nx, ny, nz, lx, ly, lz);
 
   return (R *)Func;
 }

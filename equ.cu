@@ -11,6 +11,8 @@
 static __constant__ Z Nx, Ny, Nz, Stride, Ndata, Ntotal; /* sizes */
 static __constant__ Z Xghost, Yghost, Hghost; /* offsets */
 static __constant__ R Dx[RADIUS], Dy[RADIUS], Dz[RADIUS];
+static __constant__ R Dxx[RADIUS + 1], Dyy[RADIUS + 1], Dzz[RADIUS + 1];
+static __constant__ R Nu;
 
 static uint3 Gsz, Bsz;
 
@@ -25,7 +27,7 @@ __global__ void rolling_cache(R *res, const R *f)
   const Z j = threadIdx.y + RADIUS;
 
   /* Store derivatives */
-  R fx[N_VAR], fy[N_VAR], fz[N_VAR];
+  R fx[N_VAR], fy[N_VAR], fz[N_VAR], ddf[3];
 
   /* Free running index along z direction */
   Z k;
@@ -157,6 +159,8 @@ __global__ void rolling_cache(R *res, const R *f)
       fy[l] = D_Y;
       fz[l] = D_Z;
 
+      if(l) ddf[l-1] = D_XX + D_YY + D_ZZ;
+
       __syncthreads();
     }
 
@@ -166,11 +170,11 @@ __global__ void rolling_cache(R *res, const R *f)
       /* Continuity equation */
       RES(0, k) -= ADVECTION(0) + fx[1] + fy[2] + fz[3];
       /* x-momentum equation */
-      RES(1, k) -= ADVECTION(1) + fx[0];
+      RES(1, k) -= ADVECTION(1) + fx[0] - Nu * ddf[0];
       /* y-momentum equation */
-      RES(2, k) -= ADVECTION(2) + fy[0];
+      RES(2, k) -= ADVECTION(2) + fy[0] - Nu * ddf[1];
       /* z-momentum equation */
-      RES(3, k) -= ADVECTION(3) + fz[0];
+      RES(3, k) -= ADVECTION(3) + fz[0] - Nu * ddf[2];
     }
     __syncthreads();
   }
@@ -180,14 +184,14 @@ __global__ void rolling_cache(R *res, const R *f)
 
 }
 
-void initialize_pde(const Z nx, const Z ny, const Z nz,
-                    const R lx, const R ly, const R lz)
+void initialize_pde(const R nu, const Z nx, const Z ny, const Z nz,
+                                const R lx, const R ly, const R lz)
 {
   cudaError_t err;
 
-  const R dx = lx / nx;
-  const R dy = ly / ny;
-  const R dz = lz / nz;
+  const R dx = lx / nx, dx2 = dx * dx;
+  const R dy = ly / ny, dy2 = dy * dy;
+  const R dz = lz / nz, dz2 = dz * dz;
 
   const Z xghost = ny * nz * RADIUS;
   const Z yghost = nz * nx * RADIUS;
@@ -197,8 +201,9 @@ void initialize_pde(const Z nx, const Z ny, const Z nz,
   const Z ndata  = nx * ny * nz;
   const Z ntotal = ndata + 2 * hghost;
 
-  const R coef[] = {45.0/60.0, -9.0/60.0, 1.0/60.0};
-  R temp[RADIUS];
+  const R coef [] = { 45.0/60.0, -9.0/60.0, 1.0/60.0};
+  const R coef2[] = {-490./180., 270./180.,-27./180., 2./180.};
+  R temp[RADIUS + 1];
   Z i;
 
   err = cudaMemcpyToSymbol("Nx", &nx, sizeof(Z));
@@ -232,6 +237,21 @@ void initialize_pde(const Z nx, const Z ny, const Z nz,
 
   for(i = 0; i < RADIUS; ++i) temp[i] = coef[i] / dz;
   err = cudaMemcpyToSymbol("Dz", temp, RADIUS * sizeof(R));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+
+  for(i = 0; i < RADIUS + 1; ++i) temp[i] = coef2[i] / dx2;
+  err = cudaMemcpyToSymbol("Dxx", temp, (RADIUS + 1) * sizeof(R));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+
+  for(i = 0; i < RADIUS + 1; ++i) temp[i] = coef2[i] / dy2;
+  err = cudaMemcpyToSymbol("Dyy", temp, (RADIUS + 1) * sizeof(R));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+
+  for(i = 0; i < RADIUS + 1; ++i) temp[i] = coef2[i] / dz2;
+  err = cudaMemcpyToSymbol("Dzz", temp, (RADIUS + 1) * sizeof(R));
+  if(cudaSuccess != err) error(cudaGetErrorString(err));
+
+  err = cudaMemcpyToSymbol("Nu", &nu, sizeof(R));
   if(cudaSuccess != err) error(cudaGetErrorString(err));
 
   Bsz.x = TILE_X;

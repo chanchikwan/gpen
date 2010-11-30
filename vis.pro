@@ -32,9 +32,9 @@ pro vis, i
   print, min(rho), max(rho)
   
   window, 0, xSize=2*nx, ySize=2*ny
-  tvscl, rho[*,*,nz/2-1], 0
-  tvscl,  ux[*,*,nz/2-1], 1
-  tvscl,  uy[*,*,nz/2-1], 2
-  tvscl,  uz[*,*,nz/2-1], 3
+  tvscl, rho[*,*,nz/2], 0
+  tvscl,  ux[*,*,nz/2], 1
+  tvscl,  uy[*,*,nz/2], 2
+  tvscl,  uz[*,*,nz/2], 3
 
 end
