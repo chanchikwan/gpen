@@ -5,16 +5,19 @@ pro vis, i
 
   openr, lun, name, /get_lun
 
-    lx = 0. & readu, lun, lx
-    ly = 0. & readu, lun, ly
-    lz = 0. & readu, lun, lz
+    lx = 0d & readu, lun, lx
+    ly = 0d & readu, lun, ly
+    lz = 0d & readu, lun, lz
 
     nx = 0L & readu, lun, nx
     ny = 0L & readu, lun, ny
     nz = 0L & readu, lun, nz
     nv = 0L & readu, lun, nv
 
-    f  = fltarr(nx, ny, nz, nv)
+    print, lx, ly, lz
+    print, nx, ny, nz, nv
+
+    f  = dblarr(nx, ny, nz, nv)
     readu, lun, f
 
   close, lun & free_lun, lun
