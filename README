@@ -1,0 +1,76 @@
+Reimplementing the pencil code for GPU so we call it G-Pen*
+===========================================================
+
+NAMES: For file names and function names, we try to follow the pencil
+  code convention.  We avoid global variables.  Because grid size is
+  only needed for a few places, we use functions to set file-scope
+  variables.  Macros are always named by upper cases with underscores,
+  e.g. N_VAR.  Global variables start with upper cases but followed by
+  lower cases, e.g. Nx.  Underscores are used if necessary.  Local
+  variables should be named short, with lower cases and no underscore,
+  e.g., ndata.  See the source code of FFTW for more on our
+  programming style.
+
+ARRAYS: We want to make the x-stride == 1 but C arrays are row major.
+  Therefore, we need to define stack arrays backward:
+
+    R array[Nz][Ny][Nx];
+    array[k][j][i] = ...;
+
+  For heap arrays, we use
+
+    R *array = (R *)malloc(sizeof(R) * Nz * Ny * Nx);
+    array[(k * Ny + j) * Nx + i] = ...;
+
+  For CPU, it is standard to use macro
+
+    #define N(k,j,i) ((k * Ny + j) * Nx + i)
+
+  to get the 1D index.  However, we load the graphic card memory into
+  sheared memory or register in each CUDA thread.  Such a macro
+  expansion is not necessary.
+
+ARCHITECTURE: We use the so called "rolling cache" method to optimize
+  the GPU code (Micikevicius 2009).  Instead of working on 1 x 1 x Nx
+  pencils as in the pencil code, we use Nz x 8 x 16 pencil bundles.
+  Nz x 1 x 1 sub-pencils are then mapped naturally to CUDA threads,
+  with an internal for-loop scanning along the z-direction.  The whole
+  domain is than mapped into a grid of (Ny/8) x (Nx/16) blocks.
+
+  To optimize the number of computations per memory-load, we will have
+  a heavy kernel.  To break the code into manageable modules, we need
+  to use macros or device functions.  As far as I know, it is
+  impossible to call device functions across files.  Therefore, all
+  device functions must be included by the kernel file.  This is ugly.
+  Using some scripts to automatically paste device functions together
+  (see, for example, the book "Code Generation in Action" by
+  Herrington, 2003) is probably a better approach.
+
+GHOST ZONES: When writing a finite difference (or finite volume) code
+  using for-loops, the ghost zones should be packed into the data
+  arrays.  This allows the uniform operation on the actual data zones:
+
+    for(i = GHOST_SZ; i < N + GHOST_SZ; ++i) ...
+
+  However, we need to load data into the shared memory anyway.  There
+  is no need to pack the ghost zones together with the data.  In fact,
+  because we need to copy the ghost zones to the main memory in order
+  to use MPI, it is better if we can put all the ghost zones in a
+  different pool.  This reduces the number of call to cudaMemcpy().
+
+MEMORY LAYOUT: Taking the rolling cache algorithm into account, we
+  will pack the ghost zones along the z-direction because there is a
+  for-loop along the z-direction.  Note that, for performance reason,
+  we will use structure of pointers instead of pointer to structures.
+
+  For each variable, the memory layout can be accessed in the order:
+
+                          Nx Ny (Nz + 2 RADIUS)
+   Ny Nz RADIUS         ___________/\___________         Ny Nz RADIUS
+                       /                        \
+    [-x ghost|-y ghost|-z ghost|  data  |+z ghost|+y ghost|+x ghost]
+
+            Nz Nx RADIUS                        Nz Nx RADIUS
+
+* G-Pen is the most popular nib for drawing Japanese manga.  It is
+  capable of drawing smooth lines with variant thickness.
